@@ -1,0 +1,52 @@
+name: babywigs
+description: Ecommerce platform for baby wigs - A playful shopping experience
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # UI & Design
+  cupertino_icons: ^1.0.6
+  google_fonts: ^6.1.0
+
+  # State Management
+  provider: ^6.1.1
+
+  # Stripe Integration - temporarily commented due to web compatibility issues
+  # flutter_stripe: ^10.1.1
+  # flutter_stripe_web: ^5.1.0
+
+  # HTTP & API
+  http: ^1.1.0
+  dio: ^5.4.0
+
+  # Data & Storage
+  shared_preferences: ^2.2.2
+
+  # Utilities
+  intl: ^0.18.1
+  url_launcher: ^6.2.2
+  email_validator: ^2.1.17
+
+  # Images
+  cached_network_image: ^3.3.1
+
+  # Environment Variables
+  flutter_dotenv: ^5.1.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/
+    - .env
