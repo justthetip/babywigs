@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: babywigs-backend
+    env: node
+    region: oregon
+    plan: starter
+    buildCommand: npm install
+    startCommand: node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: STRIPE_SECRET_KEY
+        sync: false  # You'll set this manually in Render dashboard
+      - key: STRIPE_PUBLISHABLE_KEY
+        sync: false  # You'll set this manually in Render dashboard
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false  # You'll set this manually in Render dashboard
+      - key: FRONTEND_URL
+        value: https://web-5zukd4dqr-justthetip-1372s-projects.vercel.app

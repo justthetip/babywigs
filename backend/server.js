@@ -19,6 +19,11 @@ app.use(cors({
       return callback(null, true);
     }
 
+    // Allow Vercel production URL
+    if (origin === 'https://web-5zukd4dqr-justthetip-1372s-projects.vercel.app') {
+      return callback(null, true);
+    }
+
     // Allow specific frontend URL from env
     if (origin === process.env.FRONTEND_URL) {
       return callback(null, true);
@@ -56,6 +61,27 @@ app.post('/create-checkout-session', async (req, res) => {
       total: items.reduce((sum, item) => sum + (item.product.price * item.quantity), 0)
     });
 
+    // Create or retrieve Stripe customer
+    let customer;
+    const existingCustomers = await stripe.customers.list({
+      email: customerEmail,
+      limit: 1
+    });
+
+    if (existingCustomers.data.length > 0) {
+      customer = existingCustomers.data[0];
+      console.log('Found existing customer:', customer.id);
+    } else {
+      customer = await stripe.customers.create({
+        email: customerEmail,
+        metadata: {
+          created_via: 'baby_wigs_checkout',
+          first_order_date: new Date().toISOString()
+        }
+      });
+      console.log('Created new customer:', customer.id);
+    }
+
     // Convert cart items to Stripe line items
     const lineItems = items.map(item => ({
       price_data: {
@@ -80,12 +106,13 @@ app.post('/create-checkout-session', async (req, res) => {
       mode: 'payment',
       success_url: `${successUrl}?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: cancelUrl,
-      customer_email: customerEmail,
+      customer: customer.id, // Use customer ID instead of email
       shipping_address_collection: {
         allowed_countries: ['US', 'CA'], // Add more countries as needed
       },
       billing_address_collection: 'required',
       metadata: {
+        customer_id: customer.id,
         customer_email: customerEmail,
         order_date: new Date().toISOString(),
         item_count: items.length.toString(),
@@ -188,45 +215,103 @@ async function fulfillOrder(session) {
   try {
     console.log('Fulfilling order for session:', session.id);
 
-    // Here you would:
-    // 1. Save order to database
-    // 2. Send confirmation email
-    // 3. Update inventory
-    // 4. Create shipping label
-    // 5. Send tracking info
+    // Get customer details from Stripe
+    const customer = await stripe.customers.retrieve(session.customer);
+
+    // Get session with line items for order details
+    const sessionWithItems = await stripe.checkout.sessions.retrieve(session.id, {
+      expand: ['line_items']
+    });
 
     const orderData = {
       sessionId: session.id,
-      customerEmail: session.customer_email || session.customer_details?.email,
+      customerId: customer.id,
+      customerEmail: customer.email,
+      customerName: customer.name || session.customer_details?.name,
+      shippingAddress: session.shipping_details?.address,
       amountTotal: session.amount_total / 100,
       currency: session.currency,
       paymentStatus: session.payment_status,
       created: new Date(session.created * 1000),
+      items: sessionWithItems.line_items.data,
       metadata: session.metadata
     };
 
-    console.log('Order fulfilled:', orderData);
+    console.log('Order fulfilled:', {
+      sessionId: orderData.sessionId,
+      customerId: orderData.customerId,
+      customerEmail: orderData.customerEmail,
+      total: orderData.amountTotal,
+      itemCount: orderData.items.length
+    });
 
-    // Simulate email sending
-    await sendConfirmationEmail(orderData);
+    // All customer data is now stored in Stripe
+    // No local database needed!
+
+    // Stripe automatically sends receipt emails
+    // You can add custom order confirmation emails here if needed
+    await sendCustomOrderNotification(orderData);
 
   } catch (error) {
     console.error('Error fulfilling order:', error);
   }
 }
 
-// Email simulation
-async function sendConfirmationEmail(orderData) {
-  console.log(`📧 Sending confirmation email to: ${orderData.customerEmail}`);
+// Custom order notification (optional - Stripe already sends receipts)
+async function sendCustomOrderNotification(orderData) {
+  console.log(`📧 Custom order notification for: ${orderData.customerEmail}`);
+  console.log(`   Customer ID: ${orderData.customerId}`);
   console.log(`   Order total: $${orderData.amountTotal}`);
   console.log(`   Session ID: ${orderData.sessionId}`);
+  console.log(`   Items: ${orderData.items.length}`);
 
+  // Stripe automatically sends receipt emails
+  // This is for any additional custom notifications you want to send
   // In production, integrate with:
-  // - SendGrid
+  // - SendGrid for custom email templates
   // - AWS SES
   // - Mailgun
   // - etc.
 }
+
+// Customer portal endpoint (for order history)
+app.post('/create-customer-portal', async (req, res) => {
+  try {
+    const { customerEmail, returnUrl } = req.body;
+
+    // Find customer by email
+    const customers = await stripe.customers.list({
+      email: customerEmail,
+      limit: 1
+    });
+
+    if (customers.data.length === 0) {
+      return res.status(404).json({
+        error: 'Customer not found',
+        type: 'customer_not_found'
+      });
+    }
+
+    const customer = customers.data[0];
+
+    // Create portal session
+    const portalSession = await stripe.billingPortal.sessions.create({
+      customer: customer.id,
+      return_url: returnUrl || process.env.FRONTEND_URL,
+    });
+
+    res.json({
+      url: portalSession.url
+    });
+
+  } catch (error) {
+    console.error('Error creating customer portal:', error);
+    res.status(500).json({
+      error: error.message,
+      type: 'portal_creation_failed'
+    });
+  }
+});
 
 // Error handling middleware
 app.use((error, req, res, next) => {
