@@ -19,8 +19,21 @@ app.use(cors({
       return callback(null, true);
     }
 
-    // Allow Vercel production URL
-    if (origin === 'https://web-5zukd4dqr-justthetip-1372s-projects.vercel.app') {
+    // Allow Vercel production URLs (multiple deployments)
+    const allowedVercelDomains = [
+      'https://web-5zukd4dqr-justthetip-1372s-projects.vercel.app',
+      'https://web-pihbhh57l-justthetip-1372s-projects.vercel.app',
+      'https://web-h2rvhr2q8-justthetip-1372s-projects.vercel.app',
+      'https://web-five-psi-81.vercel.app', // Main production domain
+      'https://web.vercel.app' // Potential custom domain
+    ];
+
+    if (allowedVercelDomains.includes(origin)) {
+      return callback(null, true);
+    }
+
+    // Allow any Vercel preview URLs for your project
+    if (origin && origin.includes('vercel.app')) {
       return callback(null, true);
     }
 
