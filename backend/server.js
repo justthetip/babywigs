@@ -24,6 +24,11 @@ app.use(cors({
       return callback(null, true);
     }
 
+    // Allow Render's own domain (for health checks and testing)
+    if (origin === 'https://babywigs.onrender.com') {
+      return callback(null, true);
+    }
+
     // Allow specific frontend URL from env
     if (origin === process.env.FRONTEND_URL) {
       return callback(null, true);
@@ -172,15 +177,21 @@ app.post('/webhook', async (req, res) => {
   const sig = req.headers['stripe-signature'];
   let event;
 
-  try {
-    event = stripe.webhooks.constructEvent(
-      req.body,
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET
-    );
-  } catch (err) {
-    console.error('Webhook signature verification failed:', err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
+  // Skip webhook verification if secret not configured (development)
+  if (!process.env.STRIPE_WEBHOOK_SECRET) {
+    console.warn('⚠️  Webhook secret not configured - using raw body as event');
+    event = req.body;
+  } else {
+    try {
+      event = stripe.webhooks.constructEvent(
+        req.body,
+        sig,
+        process.env.STRIPE_WEBHOOK_SECRET
+      );
+    } catch (err) {
+      console.error('Webhook signature verification failed:', err.message);
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
   }
 
   // Handle the event

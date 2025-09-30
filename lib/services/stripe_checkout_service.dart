@@ -8,8 +8,10 @@ import '../models/cart_item.dart';
 class StripeCheckoutService {
   static final String _publishableKey = dotenv.env['STRIPE_PUBLISHABLE_KEY'] ?? '';
 
-  // Local backend for development
-  static const String _backendUrl = 'http://localhost:3000';
+  // Backend URL - uses local for development, Render for production
+  static const String _backendUrl = kDebugMode
+      ? 'http://localhost:3000' // Development backend
+      : 'https://babywigs.onrender.com'; // Production backend on Render
 
   Future<String?> createCheckoutSession({
     required List<CartItem> items,
